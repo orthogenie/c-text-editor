@@ -21,40 +21,50 @@
 
 /*** DATA ***/
 
+/* Config data for the editor. */
 struct editorConfig {
-	int screenrows;
-	int screencols;
-	struct termios orig_termios;
+	int cx, cy;		// Cursor position
+	int screenrows;	// Number of rows
+	int screencols;	// Number of columns
+	struct termios orig_termios;	// termios object
 };
 
+/* Global editor object. */
 struct editorConfig E;
 
+/* String buffer object */
 struct abuf {
-	char* b;
-	int len;
+	char* b;	// String buffer
+	int len;	// String length
 };
 
 /*** FUNCTIONS ***/
 
+/* Error handling */
 void die(const char*);
 
+/* Raw mode */
 void disableRawMode(void);
 void enableRawMode(void);
 
+/* Editor */
 char editorReadKey(void);
 void editorRefreshScreen(void);
 void editorProcessKeypress(void);
 void editorDrawRows(struct abuf*);
 void initEditor(void);
 
+/* Screen */
 int getWindowSize(int*, int*);
 int getCursorPosition(int*, int*);
 
+/* String buffer */
 void abAppend(struct abuf*, const char*, int);
 void abFree(struct abuf*);
 
 /*** TERMINAL HELPERS ***/
 
+/* Clear the screen and output an error message. */
 void die(const char* s) {
 	editorRefreshScreen();
 
@@ -62,12 +72,14 @@ void die(const char* s) {
 	exit(1);
 }
 
+/* Disable raw mode. */
 void disableRawMode(void) {
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == FAILURE) {
 		die("tcsetattr");
 	}
 }
 
+/* Enable raw mode. */
 void enableRawMode(void) {
 	if (tcgetattr(STDIN_FILENO, &E.orig_termios) == FAILURE) die("tcgetattr");
 	atexit(disableRawMode);
@@ -83,6 +95,7 @@ void enableRawMode(void) {
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == FAILURE) die("tcsetattr");
 }
 
+/* Read and return the character from keypress input. */
 char editorReadKey(void) {
 	int nread;
 	char c;
@@ -93,6 +106,7 @@ char editorReadKey(void) {
 	return c;
 }
 
+/* Get cursor position. */
 int getCursorPosition(int* rows, int* cols) {
 	char buf[32];
 	unsigned int i = 0;
@@ -113,6 +127,7 @@ int getCursorPosition(int* rows, int* cols) {
 	return SUCCESS;
 }
 
+/* Get terminal window size and save to given pointers. */
 int getWindowSize(int* rows, int* cols) {
 	struct winsize ws;
 
@@ -130,7 +145,7 @@ int getWindowSize(int* rows, int* cols) {
 
 /*** APPEND BUFFER ***/
 
-/* Reassign memory for buffer. */
+/* Appends the message buffer with a provided string. Reassigns memory as needed. */
 void abAppend(struct abuf* ab, const char* s, int len) {
 	char* new = realloc(ab->b, ab->len + len);
 
@@ -152,7 +167,7 @@ void editorDrawRows(struct abuf* ab) {
 	int y;
 
 	for (y = 0; y < E.screenrows; y++) {
-		if (y == E.screenrows / 3) { // First line welcome message
+		if (y == E.screenrows / 3) {	// First line welcome message
 			char welcome[80];
 			int welcomelen = snprintf(welcome, sizeof(welcome),
 				"Kilo editor -- version %s", KILO_VERSION);
@@ -169,7 +184,7 @@ void editorDrawRows(struct abuf* ab) {
 
 			abAppend(ab, welcome, welcomelen);
 		} 
-		else { // Line start symbol
+		else {	// Line start symbol
 			abAppend(ab, "~", 1);
 		}
 
@@ -183,24 +198,26 @@ void editorDrawRows(struct abuf* ab) {
 	}
 }
 
+/* Draws (writes) to the terminal screen. */
 void editorRefreshScreen(void) {
 	struct abuf ab = ABUF_INIT;
 	
-	abAppend(&ab, "\x1b[?25l", 6);
-	// abAppend(&ab, "\x1b[2J", 4);
-	abAppend(&ab, "\x1b[H", 3);
+	abAppend(&ab, "\x1b[?25l", 6);	// Hide cursor
+	abAppend(&ab, "\x1b[H", 3);		// Position cursor to the start
 
-	editorDrawRows(&ab);
+	editorDrawRows(&ab);			// Draw each line
 
-	abAppend(&ab, "\x1b[H", 3);
-	abAppend(&ab, "\x1b[?25h", 6);
+	abAppend(&ab, "\x1b[H", 3); 	// Position cursor to the start
+	abAppend(&ab, "\x1b[?25h", 6); 	// Show cursor
 
+	// Write to terminal
 	write(STDOUT_FILENO, ab.b, ab.len);
 	abFree(&ab);
 }
 
 /*** INPUT ***/
 
+/* Process keypress input. */
 void editorProcessKeypress(void) {
 	char c = editorReadKey();
 
@@ -214,10 +231,14 @@ void editorProcessKeypress(void) {
 
 /*** INIT ***/
 
+/* Initialise the editor. */
 void initEditor(void) {
+	E.cx = 0;
+	E.cy = 0;
 	if (getWindowSize(&E.screenrows, &E.screencols) == FAILURE) die("getWindowSize");
 }
 
+/* KILO TEXT EDITOR */
 int main (void) {
 	enableRawMode();
 	initEditor();
