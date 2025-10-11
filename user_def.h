@@ -1,5 +1,5 @@
-#ifndef USER_STD_H
-#define USER_STD_H
+#ifndef USER_DEF_H
+#define USER_DEF_H
 
 #define KILO_VERSION "0.0.1"
 

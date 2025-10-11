@@ -1,12 +1,14 @@
 #ifndef IO_HANDLER_H
 #define IO_HANDLER_H
 
-#include "user_std.h"
+#include "user_def.h"
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define ABUF_INIT {NULL, 0}
 
+/************/
 /*** DATA ***/
+/************/
 
 /* String buffer object */
 struct abuf {
@@ -14,7 +16,10 @@ struct abuf {
 	int len;	// String length
 };
 
+
+/*****************/
 /*** FUNCTIONS ***/
+/*****************/
 
 char editorReadKey(void);
 void editorProcessKeypress(void);

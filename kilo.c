@@ -1,6 +1,6 @@
 #include "editor.h"
 #include "io_handler.h"
-#include "user_std.h"
+#include "user_def.h"
 
 /* KILO TEXT EDITOR */
 int main (void) {

@@ -2,9 +2,11 @@
 #define EDITOR_H
 
 #include <termios.h>
-#include "user_std.h"
+#include "user_def.h"
 
+/************/
 /*** DATA ***/
+/************/
 
 /* Config data for the editor. */
 struct editorConfig {
@@ -18,7 +20,9 @@ struct editorConfig {
 struct editorConfig E;
 
 
+/*****************/
 /*** FUNCTIONS ***/
+/*****************/
 
 void die(const char*);
 void disableRawMode(void);
