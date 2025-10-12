@@ -1,37 +1,20 @@
 #ifndef EDITOR_H
 #define EDITOR_H
 
-#include <termios.h>
-#include "io_handler.h"
 #include "user_def.h"
-
-/************/
-/*** DATA ***/
-/************/
-
-/* Config data for the editor. */
-struct editorConfig {
-	int cx, cy;		// Cursor position
-	int screenrows;	// Number of rows
-	int screencols;	// Number of columns
-	struct termios orig_termios;	// termios object
-};
-
-/* Global editor object. */
-struct editorConfig E;
+#include "util.h"
 
 
 /*****************/
 /*** FUNCTIONS ***/
 /*****************/
 
-void die(const char*);
-void disableRawMode(void);
+
 void editorDrawRows(struct abuf*);
+void editorMoveCursor(int);
+void editorProcessKeypress(void);
+int editorReadKey(void);
 void editorRefreshScreen(void);
-void enableRawMode(void);
-int getWindowSize(int*, int*);
-int getCursorPosition(int*, int*);
 void initEditor(void);
 
 #endif

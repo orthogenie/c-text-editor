@@ -1,83 +1,29 @@
 #include "editor.h"
-#include "io_handler.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
-/****************/
-/*** RAW MODE ***/
-/****************/
 
-/* Disable raw mode. */
-void disableRawMode(void) {
-	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == FAILURE) {
-		die("tcsetattr");
-	}
+/************/
+/*** INIT ***/
+/************/
+
+
+/* Initialise the editor. */
+void initEditor(void) {
+	E.cx = 0;
+	E.cy = 0;
+	if (getWindowSize(&E.screenrows, &E.screencols) == FAILURE) die("getWindowSize");
 }
 
-/* Enable raw mode. */
-void enableRawMode(void) {
-	if (tcgetattr(STDIN_FILENO, &E.orig_termios) == FAILURE) die("tcgetattr");
-	atexit(disableRawMode);
-	
-	struct termios raw = E.orig_termios;
-	raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-	raw.c_oflag &= ~(OPOST);
-	raw.c_cflag &= ~(CS8);
-	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-	raw.c_cc[VMIN] = 0;
-	raw.c_cc[VTIME] = 1;
-
-	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == FAILURE) die("tcsetattr");
-}
-
-/**********************/
-/*** SCREEN HELPERS ***/
-/**********************/
-
-/* Get cursor position. */
-int getCursorPosition(int* rows, int* cols) {
-	char buf[32];
-	unsigned int i = 0;
-	
-	if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return FAILURE;
-
-	while (i < sizeof(buf) - 1) {
-		if (read(STDIN_FILENO, &buf[i], 1) != 1) return FAILURE;
-		if (buf[i] == 'R') break;
-		i++;
-	}
-
-	buf[i] = '\0';
-
-	if (buf[0] != '\x1b' || buf[1] != '[') return FAILURE;
-	if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return FAILURE;
-
-	return SUCCESS;
-}
-
-/* Get terminal window size and save to given pointers. */
-int getWindowSize(int* rows, int* cols) {
-	struct winsize ws;
-
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == FAILURE || ws.ws_col == 0) {
-		// 999 arbitary large number
-		if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return FAILURE;
-		
-		return getCursorPosition(rows, cols);
-	} else {
-		*cols = ws.ws_col;
-		*rows = ws.ws_row;
-		return SUCCESS;
-	}
-}
 
 /***********************/
 /*** TERMINAL SCREEN ***/
 /***********************/
+
 
 /* Draws (writes) to the terminal screen. */
 void editorRefreshScreen(void) {
@@ -89,10 +35,10 @@ void editorRefreshScreen(void) {
 
 	editorDrawRows(&ab);			// Draw each line
 
-	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+	// Move cursor
+	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);	// terminal commands are 1-indexed
 	abAppend(&ab, buf, strlen(buf));
 
-	// abAppend(&ab, "\x1b[H", 3); 	// Position cursor to the start
 	abAppend(&ab, "\x1b[?25h", 6); 	// Show cursor
 
 	// Write to terminal
@@ -136,21 +82,120 @@ void editorDrawRows(struct abuf* ab) {
 	}
 }
 
-/* Clear the screen and output an error message. */
-void die(const char* s) {
-	editorRefreshScreen();
+/************************/
+/*** INPUT PROCESSING ***/
+/************************/
 
-	perror(s);
-	exit(1);
+/* Process keypress input. */
+void editorProcessKeypress(void) {
+	int c = editorReadKey();
+
+	switch (c) {
+		case CTRL_KEY('q'):
+			editorRefreshScreen();
+			exit(SUCCESS);
+			break;
+
+		case HOME_KEY:
+			E.cx = 0;
+			break;
+
+		case END_KEY:
+			E.cx = E.screencols - 1;
+			break;
+
+		case PAGE_UP:
+		case PAGE_DOWN:
+			{
+				int times = E.screenrows;
+				while (times--) editorMoveCursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
+			}
+			break;
+
+		case ARROW_UP:
+		case ARROW_DOWN:
+		case ARROW_LEFT:
+		case ARROW_RIGHT:
+			editorMoveCursor(c);
+			break;
+	}
 }
 
-/************/
-/*** INIT ***/
-/************/
+/* Read and return the character from keypress input. */
+int editorReadKey(void) {
+	int nread;
+	char c;
 
-/* Initialise the editor. */
-void initEditor(void) {
-	E.cx = 0;
-	E.cy = 0;
-	if (getWindowSize(&E.screenrows, &E.screencols) == FAILURE) die("getWindowSize");
+	while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
+		if (nread == FAILURE && errno != EAGAIN) die("read");
+	}
+
+	// Handling special keys
+	if (c == '\x1b') {
+		char seq[3];
+
+		if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+
+		if (seq[0] == '[') {
+			if (seq[1] >= '0' && seq[1] <= '9') {
+				if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+				if (seq[2] == '~') {
+					switch (seq[1]) {
+						case '1': return HOME_KEY;
+						case '3': return DEL_KEY;
+						case '4': return END_KEY;
+						case '5': return PAGE_UP;
+						case '6': return PAGE_DOWN;
+						case '7': return HOME_KEY;
+						case '8': return END_KEY;
+					}
+				}
+			} else {
+				switch (seq[1]) {
+					case 'A': return ARROW_UP;
+					case 'B': return ARROW_DOWN;
+					case 'C': return ARROW_RIGHT;
+					case 'D': return ARROW_LEFT;
+					case 'H': return HOME_KEY;
+					case 'F': return END_KEY;
+				}
+			}
+		} else if (seq[0] == 'O') {
+			switch (seq[1]) {
+				case 'H': return HOME_KEY;
+				case 'F': return END_KEY;
+			}
+		}
+
+		return '\x1b';
+	} else {
+		return c;
+	}
+}
+
+/* Reads keypress and modifies cursor position */
+void editorMoveCursor(int key) {
+	switch (key) {
+		case ARROW_LEFT:
+			if (E.cx != 0) {
+				E.cx--;
+			}
+			break;
+		case ARROW_RIGHT:
+			if (E.cx != E.screencols - 1) {
+				E.cx++;
+			}
+ 			break;
+		case ARROW_UP:
+			if (E.cy != 0) {
+				E.cy--;
+			}
+			break;
+		case ARROW_DOWN:
+			if (E.cy != E.screenrows - 1) {
+				E.cy++;
+			}
+			break;
+	}
 }
