@@ -1,5 +1,4 @@
 #include "editor.h"
-#include "user_def.h"
 
 /* KILO TEXT EDITOR */
 int main (void) {
