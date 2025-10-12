@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 
@@ -81,18 +82,58 @@ int getWindowSize(int* rows, int* cols) {
 /* Draws (writes) to the terminal screen. */
 void editorRefreshScreen(void) {
 	struct abuf ab = ABUF_INIT;
+	char buf[32];
 	
 	abAppend(&ab, "\x1b[?25l", 6);	// Hide cursor
 	abAppend(&ab, "\x1b[H", 3);		// Position cursor to the start
 
 	editorDrawRows(&ab);			// Draw each line
 
-	abAppend(&ab, "\x1b[H", 3); 	// Position cursor to the start
+	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+	abAppend(&ab, buf, strlen(buf));
+
+	// abAppend(&ab, "\x1b[H", 3); 	// Position cursor to the start
 	abAppend(&ab, "\x1b[?25h", 6); 	// Show cursor
 
 	// Write to terminal
 	write(STDOUT_FILENO, ab.b, ab.len);
 	abFree(&ab);
+}
+
+/* Draw each row for each row in the terminal screen. */
+void editorDrawRows(struct abuf* ab) {
+	int y;
+
+	for (y = 0; y < E.screenrows; y++) {
+		if (y == E.screenrows / 3) {	// First line welcome message
+			char welcome[80];
+			int welcomelen = snprintf(welcome, sizeof(welcome),
+				"Kilo editor -- version %s", KILO_VERSION);
+			
+			if (welcomelen > E.screencols) welcomelen = E.screencols; // Truncate
+
+			// Centre the welcome message
+			int padding = (E.screencols - welcomelen) / 2;
+			if (padding) {
+				abAppend(ab, "~", 1);
+				padding--;
+			}
+			while (padding--) abAppend(ab, " ", 1);
+
+			abAppend(ab, welcome, welcomelen);
+		} 
+		else {	// Line start symbol
+			abAppend(ab, "~", 1);
+		}
+
+		// Clear following? line per refresh 
+		abAppend(ab, "\x1b[K", 3);
+
+		// New line
+		if (y < E.screenrows - 1) {
+			abAppend(ab, "\r\n", 2);
+		}
+	}
 }
 
 /* Clear the screen and output an error message. */

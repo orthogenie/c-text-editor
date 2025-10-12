@@ -2,6 +2,7 @@
 #define EDITOR_H
 
 #include <termios.h>
+#include "io_handler.h"
 #include "user_def.h"
 
 /************/
@@ -26,8 +27,9 @@ struct editorConfig E;
 
 void die(const char*);
 void disableRawMode(void);
-void enableRawMode(void);
+void editorDrawRows(struct abuf*);
 void editorRefreshScreen(void);
+void enableRawMode(void);
 int getWindowSize(int*, int*);
 int getCursorPosition(int*, int*);
 void initEditor(void);
