@@ -3,6 +3,12 @@
 
 #include <termios.h>
 
+
+/***************/
+/*** DEFINES ***/
+/***************/
+
+
 #define KILO_VERSION "0.0.1"
 
 #define FAILURE -1
@@ -43,7 +49,6 @@ enum editorKey {
 	PAGE_UP,			// 1007
 	PAGE_DOWN			// 1008
 };
-
 
 /* Global editor object. */
 struct editorConfig E;
