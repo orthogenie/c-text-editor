@@ -8,6 +8,9 @@
 /*** DEFINES ***/
 /***************/
 
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #define KILO_VERSION "0.0.1"
 
@@ -22,6 +25,11 @@
 /*** DATA ***/
 /************/
 
+/* Storing a row of text. */
+typedef struct erow {
+    int size;
+    char* chars;
+} erow;
 
 /* String buffer object */
 struct abuf {
@@ -34,6 +42,8 @@ struct editorConfig {
 	int cx, cy;		// Cursor position
 	int screenrows;	// Number of rows
 	int screencols;	// Number of columns
+    erow* row;      // Text row struct
+    int numrows;    // Length of text rows
 	struct termios orig_termios;	// termios object
 };
 
@@ -52,5 +62,7 @@ enum editorKey {
 
 /* Global editor object. */
 struct editorConfig E;
+
+
 
 #endif

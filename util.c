@@ -1,6 +1,6 @@
 #include "util.h"
-#include "editor.h"
 
+#include "editor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
