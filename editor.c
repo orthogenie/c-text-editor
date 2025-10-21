@@ -16,6 +16,8 @@
 void initEditor(void) {
 	E.cx = 0;
 	E.cy = 0;
+	E.rowoff = 0;
+	E.coloff = 0;
 	E.numrows = 0;
 	E.row = NULL;
 
@@ -30,6 +32,8 @@ void initEditor(void) {
 
 /* Draws (writes) to the terminal screen. */
 void editorRefreshScreen(void) {
+	editorScroll();
+
 	struct abuf ab = ABUF_INIT;
 	char buf[32];
 	
@@ -39,7 +43,7 @@ void editorRefreshScreen(void) {
 	editorDrawRows(&ab);			// Draw each line
 
 	// Move cursor
-	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);	// terminal commands are 1-indexed
+	snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.cx - E.coloff) + 1);	// terminal commands are 1-indexed
 	abAppend(&ab, buf, strlen(buf));
 
 	abAppend(&ab, "\x1b[?25h", 6); 	// Show cursor
@@ -54,8 +58,10 @@ void editorDrawRows(struct abuf* ab) {
 	int y;
 
 	for (y = 0; y < E.screenrows; y++) {
-		if (y >= E.numrows) {
-			if (E.numrows == 0 && y == E.screenrows / 3) {	// First line welcome message
+		int filerow = y + E.rowoff;
+		if (filerow >= E.numrows) {
+			if (E.numrows == 0 && y == E.screenrows / 3) {	
+				// First line welcome message
 				char welcome[80];
 				int welcomelen = snprintf(welcome, sizeof(welcome),
 					"Kilo editor -- version %s", KILO_VERSION);
@@ -71,14 +77,15 @@ void editorDrawRows(struct abuf* ab) {
 				while (padding--) abAppend(ab, " ", 1);
 
 				abAppend(ab, welcome, welcomelen);
-			} 
-			else {	// Line start symbol
+			} else {	
+				// Line start symbol
 				abAppend(ab, "~", 1);
 			}
 		} else {
-			int len = E.row[y].size;
+			int len = E.row[filerow].size - E.coloff;
+			if (len < 0) len = 0;
 			if (len > E.screencols) len = E.screencols;
-			abAppend(ab,E.row[y].chars, len);
+			abAppend(ab, &E.row[filerow].chars[E.coloff], len);
 		}
 
 		// Clear following? line per refresh 
@@ -88,6 +95,21 @@ void editorDrawRows(struct abuf* ab) {
 		if (y < E.screenrows - 1) {
 			abAppend(ab, "\r\n", 2);
 		}
+	}
+}
+
+void editorScroll(void) {
+	if (E.cy < E.rowoff) {
+		E.rowoff = E.cy;
+	}
+	if (E.cy >= E.rowoff + E.screenrows) {
+		E.rowoff = E.cy - E.screenrows + 1;
+	}
+	if (E.cx < E.coloff) {
+		E.coloff = E.cx;
+	}
+	if (E.cx >= E.coloff + E.screencols) {
+		E.coloff = E.cx - E.screencols + 1;
 	}
 }
 
@@ -215,15 +237,23 @@ int editorReadKey(void) {
 
 /* Reads keypress and modifies cursor position */
 void editorMoveCursor(int key) {
+	erow* row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
+
 	switch (key) {
 		case ARROW_LEFT:
 			if (E.cx != 0) {
 				E.cx--;
+			} else if (E.cy > 0) {
+				E.cy--;
+				E.cx = E.row[E.cy].size;
 			}
 			break;
 		case ARROW_RIGHT:
-			if (E.cx != E.screencols - 1) {
+			if (row && E.cx < row->size) {
 				E.cx++;
+			} else if (row && E.cx == row->size) {
+				E.cy++;
+				E.cx = 0;
 			}
  			break;
 		case ARROW_UP:
@@ -232,9 +262,15 @@ void editorMoveCursor(int key) {
 			}
 			break;
 		case ARROW_DOWN:
-			if (E.cy != E.screenrows - 1) {
+			if (E.cy < E.numrows) {
 				E.cy++;
 			}
 			break;
+	}
+
+	row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
+	int rowlen = row ? row->size : 0;
+	if (E.cx > rowlen) {
+		E.cx = rowlen;
 	}
 }

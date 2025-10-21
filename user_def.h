@@ -8,6 +8,7 @@
 /*** DEFINES ***/
 /***************/
 
+
 #define _DEFAULT_SOURCE
 #define _BSD_SOURCE
 #define _GNU_SOURCE
@@ -25,6 +26,7 @@
 /*** DATA ***/
 /************/
 
+
 /* Storing a row of text. */
 typedef struct erow {
     int size;
@@ -40,6 +42,8 @@ struct abuf {
 /* Config data for the editor. */
 struct editorConfig {
 	int cx, cy;		// Cursor position
+    int rowoff;     // Row offset
+    int coloff;     // Column offset
 	int screenrows;	// Number of rows
 	int screencols;	// Number of columns
     erow* row;      // Text row struct
@@ -62,7 +66,5 @@ enum editorKey {
 
 /* Global editor object. */
 struct editorConfig E;
-
-
 
 #endif

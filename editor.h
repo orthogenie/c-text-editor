@@ -18,6 +18,7 @@ void editorOpen(char*);
 void editorProcessKeypress(void);
 int editorReadKey(void);
 void editorRefreshScreen(void);
+void editorScroll(void);
 void initEditor(void);
 
 #endif
